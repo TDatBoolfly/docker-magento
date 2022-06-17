@@ -1,6 +1,5 @@
 #!/bin/bash
 set -o errexit
-docker-composer up
 read -p "Do you want install new project magento 2.4.4(Y/n): " isInstalProjectNew
 
 if [[ "$isInstalProjectNew" == "Y" || "$isInstalProjectNew" == "y" ]]; then
