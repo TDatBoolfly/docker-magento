@@ -1,12 +1,23 @@
 #!/bin/bash
 set -o errexit
+docker-composer up
+read -p "Do you want install new project magento 2.4.4(Y/n): " isInstalProjectNew
 
-DOMAIN=${1:-magento.test}
-VERSION=${2:-2.4.4}
-EDITION=${3:-community}
+if [[ "$isInstalProjectNew" == "Y" || "$isInstalProjectNew" == "y" ]]; then
+  echo "ok you choose install project"
+  DOMAIN=${1:-magento.test}
+  VERSION=${2:-2.4.4}
+  EDITION=${3:-community}
 
-curl -s https://raw.githubusercontent.com/TDatBoolfly/docker-magento/master/lib/template | bash
+  curl -s https://raw.githubusercontent.com/TDatBoolfly/docker-magento/master/lib/template | bash
 
-# &&'s are used below otherwise onelinesetup script fails/errors after bin/download
-bin/download "${VERSION}" "${EDITION}" \
-  && bin/setup "${DOMAIN}"
+  # &&'s are used below otherwise onelinesetup script fails/errors after bin/download
+  bin/download "${VERSION}" "${EDITION}" \
+    && bin/setup "${DOMAIN}"
+else
+    read -p "Git Reponsitory Project: " url
+    git clone $url
+    bin/clinotty composer install
+    bin/fixowns
+    bin/fixperms
+fi

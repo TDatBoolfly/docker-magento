@@ -1,0 +1,7 @@
+#!/bin/bash
+LIST_SERVICE=("redis-server" "elasticsearch" "mysql" "apache2")
+for service in ${LIST_SERVICE[@]}
+do
+    sudo service $service stop
+done
+echo "Stop Services Success"
