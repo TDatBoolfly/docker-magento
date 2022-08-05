@@ -1,0 +1,5 @@
+#!/bin/bash
+
+source ./env/magento.env
+check_dir=$(docker-compose exec phpfpm [ ! -d "$ROOT_WORK_DIR" ] && echo 0)
+[[ $check_dir == 0 ]] &&  echo "Root work dir not exists!. Please choose folder exists" && bin/switch-root-dir && source ./env/magento.env;

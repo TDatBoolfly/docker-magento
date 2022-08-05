@@ -1,0 +1,6 @@
+#!/bin/bash
+
+# shellcheck source=../env/db.env
+source env/db.env
+
+sudo bin/cli mysql -h"${MYSQL_HOST}" -uroot -p"${MYSQL_ROOT_PASSWORD}" "$@"

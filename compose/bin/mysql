@@ -4,8 +4,15 @@
 source env/db.env
 if [ -t 0 ]; then
   # Need tty to run mysql shell
-  bin/cli mysql -h"${MYSQL_HOST}" -u"${MYSQL_USER}" -p"${MYSQL_PASSWORD}" "${MYSQL_DATABASE}" "$@"
+  bin/cli mysql -h"${MYSQL_HOST}" "$@"
 else
   # Read from stdin, ex: bin/mysql < dbdump.sql
-  bin/clinotty mysql -h"${MYSQL_HOST}" -u"${MYSQL_USER}" -p"${MYSQL_PASSWORD}" "${MYSQL_DATABASE}" "$@"
+  bin/clinotty mysql -h"${MYSQL_HOST}" "$@"
 fi
+
+
+# CREATE USER 'lifeaid-eu-magento2'@'%' IDENTIFIED BY 'p@ssword';
+# GRANT ALL PRIVILEGES ON *.* TO 'lifeaid-eu-magento2'@'%' IDENTIFIED BY 'p@ssword';
+# FLUSH PRIVILEGES;
+# check
+# SHOW GRANTS FOR 'lifeaid-eu-magento2'@'%';

@@ -1,0 +1,22 @@
+#!/bin/bash
+set -o errexit
+source ./env/magento.env
+
+while [[ 0 ]]
+do
+  echo "List folder exists: "
+  docker-compose exec phpfpm ls -1 | nl
+  read -p "Enter work dir: " dir
+  echo "You are choose work dir: $dir"
+  ROOT_WORK_DIR=$dir
+  check_dir=$(docker-compose exec phpfpm [ -d "$ROOT_WORK_DIR" ] && echo 1)
+  if [[ $check_dir == 1 ]];
+  then
+     sed -i '/^ROOT_WORK_DIR/d' ./env/magento.env
+     echo "ROOT_WORK_DIR=$ROOT_WORK_DIR" >> ./env/magento.env
+     echo "Change root work dir success"
+     break
+  else
+     echo "Root work dir not exists!. Please choose folder exists"
+  fi
+done

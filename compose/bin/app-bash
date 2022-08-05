@@ -1,0 +1,4 @@
+#!/bin/bash
+CONTAINER_ID=$(docker-compose ps -q app)
+
+docker exec -it "$CONTAINER_ID" sh
