@@ -1,7 +1,10 @@
 #!/bin/bash
 
 # shellcheck source=../env/db.env
-source env/db.env
+
+source "env/magento.env"
+source "env/$( echo "$ROOT_WORK_DIR" | sed -Ee  's/([^A-Za-z0-9_])/_/g' )/db.env"
+
 if [ -t 0 ]; then
   # Need tty to run mysql shell
   bin/cli mysql -h"${MYSQL_HOST}" "$@"

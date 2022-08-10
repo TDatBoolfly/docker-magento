@@ -1,0 +1,46 @@
+#!/bin/bash
+set -o errexit
+
+bin/force-start-container
+
+while [[ 0 ]];
+do
+  read -p "Enter Url Project: " url_git_project
+  [[ ! -z $url_git_project ]] && break
+done
+
+folder=$(basename $url_git_project .git)
+
+echo "Change work root dir outto /var/www/html/"
+bin/switch-root-dir .
+
+docker-compose exec phpfpm [ ! -d "$folder" ] && bin/cli git clone $url_git_project
+
+
+echo "Change work root dir into $folder"
+bin/switch-root-dir $folder
+
+echo "Checkout branch setup"
+bin/clinotty git branch --all
+read -p "Enter branch name: " branch
+bin/clinotty git checkout $branch
+bin/clinotty git branch
+
+bin/new-database $folder
+
+bin/cli [ ! -f 'authen.json' ] && bin/cli cp auth.json.sample auth.json
+
+ENV_FOLDER=$( echo "$folder" | sed -Ee  's/([^A-Za-z0-9_])/_/g' )
+source "env/$ENV_FOLDER/db.env"
+
+echo "Please do the following steps:"
+echo " 1. Import Database"
+echo "  IF You can't import database with command bin/mysql. You can use command"
+echo "   - docker-compose exec -T phpfpm mysql -h$MYSQL_HOST  -u$MYSQL_USER -p$MYSQL_PASSWORD $MYSQL_DATABASE < {Path file database} "
+echo " 2. Provide required composer credentials at file auth.json in ROOT MAGENTO"
+echo "   - With Command: bin/cli vim auth.json"
+echo " 3. Run command setup: bin/setup"
+
+
+#https://gitlab.com/zhangwanhua/lifeaid-eu-magento2.git
+#/Users/boolfly/Documents/lifeaid/eu/lifeaid_eu_18072022_clean.sql

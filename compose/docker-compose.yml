@@ -13,12 +13,29 @@
 version: "3.9"
 
 services:
+  whoami:
+    # A container that exposes an API to show its IP address
+    image: traefik/whoami
+    labels:
+      - "traefik.http.routers.whoami.rule=Host(`whoami.docker.localhost`)"
+  reverse-proxy:
+    image: traefik:v2.8
+    # Enables the web UI and tells Traefik to listen to docker
+    command: --api.insecure=true --providers.docker
+    ports:
+      # The HTTP port
+      - "80:80"
+      # The Web UI (enabled by --api.insecure=true)
+      - "8080:8080"
+    volumes:
+      # So that Traefik can listen to the Docker events
+      - /var/run/docker.sock:/var/run/docker.sock
   app:
 #    image: markoshust/magento-nginx:1.18-7
     build: "images/nginx/1.18"
     ports:
-      - "80:8000"
-      - "443:8443"
+      - "808:8000"
+      - "4433:8443"
     volumes: &appvolumes
       - ~/.composer:/var/www/.composer:cached
       - ~/.ssh/id_rsa:/var/www/.ssh/id_rsa:cached
@@ -32,7 +49,7 @@ services:
       #- "magento.test:172.17.0.1"
 
   phpfpm:
-    image: markoshust/magento-php:8.1-fpm-1
+    image: markoshust/magento-php:${PHP_VERSION}
     volumes: *appvolumes
     env_file: env/phpfpm.env
     #extra_hosts: *appextrahosts
@@ -92,6 +109,11 @@ services:
   #  ports:
   #    - "5900:5900"
   #  extra_hosts: *appextrahosts
+  ssh:
+    image: markoshust/ssh
+    ports:
+      - "22:22"
+    volumes: *appvolumes
 
 volumes:
   appdata:

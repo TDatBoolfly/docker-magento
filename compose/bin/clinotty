@@ -3,5 +3,4 @@
 # -T: Disable pseudo-tty allocation
 
 source bin/check-root-work-dir
-
 docker-compose exec -T -w "/var/www/html/$ROOT_WORK_DIR/" phpfpm "$@"

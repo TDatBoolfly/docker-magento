@@ -5,14 +5,19 @@ MEM=$(docker info | grep "Total Memory" | cut -d':' -f2 | xargs | sed s/GiB//)
 # Docker reports RAM 0.2 less than what it is actually set to
 (( $(echo "$MEM < 5.8" | bc -l) )) && echo "There must be at least 6GB of RAM allocated to Docker to continue." && exit
 
-# shellcheck source=../env/db.env
-source env/db.env
+bin/force-start-container
+
 # shellcheck source=../env/elasticsearch.env
 source env/elasticsearch.env
 # shellcheck source=../env/magento.env
 source env/magento.env
 # shellcheck source=../env/rabbitmq.env
 source env/rabbitmq.env
+
+# shellcheck source=../env/db.env
+env_db=$(echo $ROOT_WORK_DIR| sed -Ee  's/([^A-Za-z0-9_])/_/g')
+source "env/$env_db/db.env"
+
 
 DOMAIN=${1:-"${ROOT_WORK_DIR}.test"}
 
@@ -21,9 +26,17 @@ DOMAIN=${1:-"${ROOT_WORK_DIR}.test"}
 # docker-compose -f docker-compose.yml up -d
 [ $? != 0 ] && echo "Failed to start Docker services" && exit
 
+#echo "Setup composer auth"
+##bin/setup-composer-auth
+#bin/clinotty rm -rf vendor/
+bin/clinotty rm -f app/etc/env.php app/etc/config.php
+#bin/clinotty git restore vendor/
+#bin/composer clearcache
+echo "Composer installing"
+bin/clinotty composer install
+
 bin/fixowns
 bin/fixperms
-
 
 echo "Waiting for connection to Elasticsearch..."
 bin/clinotty timeout $ES_HEALTHCHECK_TIMEOUT bash -c "
@@ -41,13 +54,21 @@ bin/clinotty timeout $RABBITMQ_HEALTHCHECK_TIMEOUT bash -c "
         sleep 2
     done"
 [ $? != 0 ] && echo "Failed to connect to RabbitMQ" && exit
-project=$(echo $ROOT_WORK_DIR|sed 's/\W/_/g')
-echo $project
+
+mkdir -p "src/$ROOT_WORK_DIR"
+cp src/env.php src/$ROOT_WORK_DIR
+cp src/config.php src/$ROOT_WORK_DIR/config.php
+
+bin/copytocontainer env.php app/etc/env.php
+bin/copytocontainer config.php app/etc/config.php
+bin/fixowns
+bin/fixperms
+
 bin/clinotty bin/magento setup:config:set \
   --db-host="${MYSQL_HOST}" \
-  --db-name="${project}" \
-  --db-user="${ROOT_WORK_DIR}" \
-  --db-password="${lifeaid_eu_magento2_pass}" \
+  --db-name="${MYSQL_DATABASE}" \
+  --db-user="${MYSQL_USER}" \
+  --db-password="${MYSQL_PASSWORD}" \
   --backend-frontname="$MAGENTO_ADMIN_FRONTNAME" \
   --amqp-host="$RABBITMQ_HOST" \
   --amqp-port="$RABBITMQ_PORT" \
@@ -64,33 +85,36 @@ bin/clinotty bin/magento setup:config:set \
   --session-save-redis-host=redis \
   --session-save-redis-log-level=4
 
-bin/mysql -u"$ROOT_WORK_DIR" -p"p@ssword" "$project" -e "insert into core_config_data(scope,scope_id,path,value) value ('default',0,'catalog/search/engine','elasticsearch7');
-insert into core_config_data(scope,scope_id,path,value) value ('default',0,'catalog/search/elasticsearch7_server_hostname','${ES_HOST}');
-insert into core_config_data(scope,scope_id,path,value) value ('default',0,'catalog/search/elasticsearch7_server_port','${ES_PORT}');
-insert into core_config_data(scope,scope_id,path,value) value ('default',0,'catalog/search/elasticsearch7_index_prefix','magento_${project}');
+
+ES_INDEX_PREFIX=$MYSQL_DATABASE
+
+echo "config elasticsearch"
+bin/mysql -u"$MYSQL_USER" -p"$MYSQL_PASSWORD" "$MYSQL_DATABASE" -e "REPLACE into core_config_data(scope,scope_id,path,value) value ('default',0,'catalog/search/engine','elasticsearch7');
+REPLACE into core_config_data(scope,scope_id,path,value) value ('default',0,'catalog/search/elasticsearch7_server_hostname','${ES_HOST}');
+REPLACE into core_config_data(scope,scope_id,path,value) value ('default',0,'catalog/search/elasticsearch7_server_port','${ES_PORT}');
+REPLACE into core_config_data(scope,scope_id,path,value) value ('default',0,'catalog/search/elasticsearch7_index_prefix','magento_${ES_INDEX_PREFIX}');
 ";
 
 # echo "Copying files from container to host after install..."
-# bin/copyfromcontainer --all
-echo "Enable Module"
-bin/magento module:enable --all
-# bin/magento module:disable Magento_Inventory Magento_InventoryAdminUi Magento_InventoryAdvancedCheckout Magento_InventoryApi Magento_InventoryBundleProduct Magento_InventoryBundleProductAdminUi Magento_InventoryCatalog Magento_InventorySales Magento_InventoryCatalogAdminUi Magento_InventoryCatalogApi Magento_InventoryCatalogSearch Magento_InventoryConfigurableProduct Magento_InventoryConfigurableProductAdminUi Magento_InventoryConfigurableProductIndexer Magento_InventoryConfiguration Magento_InventoryConfigurationApi Magento_InventoryDistanceBasedSourceSelection Magento_InventoryDistanceBasedSourceSelectionAdminUi Magento_InventoryDistanceBasedSourceSelectionApi Magento_InventoryElasticsearch Magento_InventoryExportStockApi Magento_InventoryIndexer Magento_InventorySalesApi Magento_InventoryGroupedProduct Magento_InventoryGroupedProductAdminUi Magento_InventoryGroupedProductIndexer Magento_InventoryImportExport Magento_InventoryCache Magento_InventoryLowQuantityNotification Magento_InventoryLowQuantityNotificationApi Magento_InventoryMultiDimensionalIndexerApi Magento_InventoryProductAlert Magento_InventoryRequisitionList Magento_InventoryReservations Magento_InventoryReservationCli Magento_InventoryReservationsApi Magento_InventoryExportStock Magento_InventorySalesAdminUi Magento_InventorySalesFrontendUi Magento_InventorySetupFixtureGenerator Magento_InventoryShipping Magento_InventorySourceDeductionApi Magento_InventorySourceSelection Magento_InventorySourceSelectionApi Magento_InventoryLowQuantityNotificationAdminUi Magento_InventoryShippingAdminUi Magento_InventoryGraphQl
 
-echo "Apply config"
-bin/clinotty bin/magento setup:upgrade
 
-echo "Turning on developer mode..."
-bin/clinotty bin/magento deploy:mode:set developer
+#echo "Apply config"
+#bin/clinotty bin/magento setup:upgrade
+#bin/magento module:disable Magento_Inventory Magento_InventoryAdminUi Magento_InventoryAdvancedCheckout Magento_InventoryApi Magento_InventoryBundleProduct Magento_InventoryBundleProductAdminUi Magento_InventoryCatalog Magento_InventorySales Magento_InventoryCatalogAdminUi Magento_InventoryCatalogApi Magento_InventoryCatalogSearch Magento_InventoryConfigurableProduct Magento_InventoryConfigurableProductAdminUi Magento_InventoryConfigurableProductIndexer Magento_InventoryConfiguration Magento_InventoryConfigurationApi Magento_InventoryDistanceBasedSourceSelection Magento_InventoryDistanceBasedSourceSelectionAdminUi Magento_InventoryDistanceBasedSourceSelectionApi Magento_InventoryElasticsearch Magento_InventoryExportStockApi Magento_InventoryIndexer Magento_InventorySalesApi Magento_InventoryGroupedProduct Magento_InventoryGroupedProductAdminUi Magento_InventoryGroupedProductIndexer Magento_InventoryImportExport Magento_InventoryCache Magento_InventoryLowQuantityNotification Magento_InventoryLowQuantityNotificationApi Magento_InventoryMultiDimensionalIndexerApi Magento_InventoryProductAlert Magento_InventoryRequisitionList Magento_InventoryReservations Magento_InventoryReservationCli Magento_InventoryReservationsApi Magento_InventoryExportStock Magento_InventorySalesAdminUi Magento_InventorySalesFrontendUi Magento_InventorySetupFixtureGenerator Magento_InventoryShipping Magento_InventorySourceDeductionApi Magento_InventorySourceSelection Magento_InventorySourceSelectionApi Magento_InventoryLowQuantityNotificationAdminUi Magento_InventoryShippingAdminUi Magento_InventoryGraphQl
 
-echo "Clearing the cache to apply updates..."
-bin/clinotty bin/magento cache:flush
+#echo "Turning on developer mode..."
+#bin/clinotty bin/magento deploy:mode:set developer
+
+#echo "Clearing the cache to apply updates..."
+#bin/clinotty bin/magento cache:flush
 # echo "Forcing deploy of static content to speed up initial requests..."
 # bin/clinotty bin/magento setup:static-content:deploy -f
 
-echo "Re-indexing with Elasticsearch..."
-bin/clinotty bin/magento indexer:reindex
+#echo "Re-indexing with Elasticsearch..."
+#bin/clinotty bin/magento indexer:reindex
 
 echo "Setting basic URL and generating SSL certificate..."
+
 bin/setup-domain "${DOMAIN}"
 
 # echo "Installing cron, run 'bin/cron start' to enable..."

@@ -1,0 +1,7 @@
+#!/bin/bash
+
+[ -z "$1" ] && echo "Please specify a CLI command (ex. ls)" && exit
+
+CONTAINER_ID=$(docker-compose ps -q app)
+
+docker exec -it -u root "$CONTAINER_ID" "$@"

@@ -1,0 +1,26 @@
+#!/bin/bash
+set -o errexit
+source ./env/db.env
+
+DB_NAME=$( echo "$@" | sed -Ee  's/([^A-Za-z0-9_])/_/g' )
+
+[[ -z "$DB_NAME" ]] && echo "Database name is empty" && exit
+
+bin/mysqlroot -e "create database if not exists $DB_NAME"
+bin/mysqlroot -e "GRANT ALL PRIVILEGES ON $DB_NAME.* To '$DB_NAME'@'%' IDENTIFIED BY 'p@ssword';"
+bin/mysqlroot -e "FLUSH PRIVILEGES;"
+
+mkdir -p "./env/$DB_NAME"
+
+printf "%s\n%s\n%s\n%s" "MYSQL_HOST=$MYSQL_HOST" "MYSQL_DATABASE=$DB_NAME" "MYSQL_USER=$DB_NAME" "MYSQL_PASSWORD=p@ssword" > "./env/$DB_NAME/db.env"
+
+bin/mysql -u"$DB_NAME" -p"p@ssword" "$DB_NAME" -e"show databases"
+
+echo ""
+echo "Successfully created database '$DB_NAME'"
+echo "Database name: $DB_NAME"
+echo "User: $DB_NAME"
+echo "Password: p@ssword"
+echo ""
+
+
