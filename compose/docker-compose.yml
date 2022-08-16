@@ -13,11 +13,15 @@
 version: "3.9"
 
 services:
+  nginxapp:
+    image: nginx:1.18-alpine
+
   whoami:
     # A container that exposes an API to show its IP address
     image: traefik/whoami
     labels:
-      - "traefik.http.routers.whoami.rule=Host(`whoami.docker.localhost`)"
+      - "traefik.enable=true"
+      - "traefik.http.routers.whoami.rule=Host(`lifeaid.docker.localhost`)"
   reverse-proxy:
     image: traefik:v2.8
     # Enables the web UI and tells Traefik to listen to docker
@@ -33,9 +37,12 @@ services:
   app:
 #    image: markoshust/magento-nginx:1.18-7
     build: "images/nginx/1.18"
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.app.rule=Host(`magento.test`)"
     ports:
-      - "808:8000"
-      - "4433:8443"
+      - "8000"
+      - "8443:8443"
     volumes: &appvolumes
       - ~/.composer:/var/www/.composer:cached
       - ~/.ssh/id_rsa:/var/www/.ssh/id_rsa:cached
